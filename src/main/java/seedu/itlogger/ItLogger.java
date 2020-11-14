@@ -1,7 +1,7 @@
 package seedu.itlogger;
 
 import seedu.itlogger.exception.EmptyListException;
-
+import seedu.itlogger.storage.StorageFile;
 import java.io.IOException;
 import java.text.ParseException;
 import java.util.Vector;
@@ -36,6 +36,8 @@ import static seedu.itlogger.Search.searchOwner;
 import static seedu.itlogger.Search.searchSeverity;
 import static seedu.itlogger.Search.searchStatus;
 import static seedu.itlogger.Search.searchTitle;
+import static seedu.itlogger.Parser.parseListType;
+import static seedu.itlogger.SortList.sortList;
 
 public class ItLogger {
 
@@ -44,6 +46,9 @@ public class ItLogger {
      */
 
     private static final Logger logger = Logger.getLogger(ItLogger.class.getName());
+    private static StorageFile storage = new StorageFile();
+
+
 
     /**
      * Main entry-point for the java.duke.Duke application.
@@ -72,8 +77,16 @@ public class ItLogger {
         InputHandler inputHandler = new InputHandler();
 
         // Program starting point:
+
         IssueList issueList = new IssueList();
         assert issueList != null : "issueList should have been created";
+        try {
+            storage.load(issueList);
+        } catch (StorageFile.StorageOperationException e) {
+            Interface.printErrorMessageToUser(e);
+        } //catch (FileNotFoundException e) {
+        //System.out.println("File not found. No Tasks preloaded.");
+        //}
         logger.info("Creating ITLogger issue list...");
 
         printLogo();
@@ -83,8 +96,8 @@ public class ItLogger {
             logger.info("Getting username from user...");
             userName = getInput();
             logger.fine("completed the obtaining of username...");
-            assert userName != "" : "username should have been captured. Should not be empty";
-            assert userName != null : "username should have been captured. Should not be null";
+            assert !userName.equals("") : "username should have been captured. Should not be empty";
+            assert !userName.equals(null)  : "username should have been captured. Should not be null";
         }
         greeter(userName);
         boolean keepRun = true;
@@ -96,7 +109,7 @@ public class ItLogger {
                 logger.info("getting instruction for program...");
                 input = getInput();
                 logger.info("finished getting instruction for program...");
-                assert input != "" : "input should have been captured. Should not be empty";
+                assert !input.equals("") : "input should have been captured. Should not be empty";
             }
             KeyWord command = KeyWord.OTHERS;
 
@@ -134,7 +147,7 @@ public class ItLogger {
                     Defect defect = issueList.getDefect(parseIndex(input,issueList.getSize()));
                     boolean isExit = false;
                     do {
-                        String updateCommandContent = "";
+                        String updateCommandContent;
                         System.out.println("You are modifying:");
                         System.out.println(defect.toString());
                         Interface.printUpdateContent();
@@ -159,7 +172,6 @@ public class ItLogger {
                 try {
 
                     System.out.println(issueList.getDefect(parseIndex(input,issueList.getSize())).toString());
-
                     logger.info("Obtained the specific defect...");
                     int indexOfDefect = parseIndex(input,issueList.getSize());
                     assert indexOfDefect >= 0 : "Viewing index shall non-negative";
@@ -197,7 +209,11 @@ public class ItLogger {
                 // todo -> list ALL avaliable Defect in Issue List
                 logger.info("Performing listing operation for ItLogger, showing all defect...");
                 try {
-                    Vector toBeDisplayed = issueList.getIssue();
+                    int listKeyword = 0;
+                    if (input.contains("/")) {
+                        listKeyword = parseListType(input);
+                    }
+                    Vector toBeDisplayed = sortList(issueList, listKeyword);
                     logger.info("Obtained issueList...");
                     assert toBeDisplayed != null : "IT logger issue list should exists";
                     if (toBeDisplayed.size() == 0) {
@@ -211,6 +227,9 @@ public class ItLogger {
                     }
                 } catch (EmptyListException e) {
                     logger.log(Level.WARNING,"Problem displaying list. error is: " + e.getMessage(), e);
+                    emptyErrorMsg();
+                } catch (ParseException e) {
+                    logger.log(Level.WARNING,"Parsing keywords. error is: " + e.getMessage(), e);
                     emptyErrorMsg();
                 }
                 break;
@@ -244,10 +263,15 @@ public class ItLogger {
                 break;
             case HELP:
                 logger.info("help operation started");
-                String helpFilePath = "docs/help.txt";
-                printFileToUser(helpFilePath);
+                printFileToUser();
                 break;
             case EXIT:
+                try {
+                    storage.save(issueList);
+                } catch (StorageFile.StorageOperationException e) {
+                    System.out.println("Issue saving file. Exiting Program");
+                }
+
                 logger.info("exiting program");
                 logger.config("updating program config to quit");
                 keepRun = false;
